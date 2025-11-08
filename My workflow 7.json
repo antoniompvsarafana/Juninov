@@ -1,0 +1,392 @@
+{
+  "name": "My workflow 7",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        16,
+        144
+      ],
+      "id": "bac39dce-71cc-4fb2-b609-51b6df1b6c47",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "2dy6HRLshRFw2Eet",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=phone_last9 = {{ ($json.body?.note || \"\").replace(/[^0-9]/g, \"\").slice(-9) }}\nuser_text   = {{ $json.body?.message || \"\" }}\n\n\nRULES:\n- You must use the TOOLS; do not invent data.\n- Always pass {\"phone_last9\": phone_last9} to the tools.\n- If a tool returns multiple records, use the first item in response (the most recent).\n\nFIELD MAPPING (Policy):\n- “policy number”, “policy id”  -> fields[\"Policy ID\"]\n- “status”, “state”             -> fields[\"Status\"]\n- “type”, “policy type”         -> fields[\"Policy Type\"]\n- “premium”, “monthly premium”  -> fields[\"Monthly Premium\"]\n- “coverage”, “coverage amount” -> fields[\"Coverage Amount\"]\n- “deductible”, “franchise”     -> fields[\"Deductible\"]\n- “start”, “start date”         -> fields[\"Start Date\"]\n- “end”, “end date”, “validity” -> fields[\"End Date\"]\n- “notes”                       -> fields[\"Notes\"]\n\nSTEPS:\n1) Call FindContactByPhone -> get name = response[0].fields[\"Customer Name\"] (if it exists).\n2) Depending on user_text:\n   - If the question asks about policy/status/premium/coverage/deductible/dates/notes/type:\n       call FindPolicyByPhone, read the appropriate field, and answer.\n   - If the question is only “who am I” / “what is my phone number”:\n       answer with the contact’s name/phone.\n   - If you’re unsure which field to use, reply with a concise list of available fields.\n\nOUTPUT FORMAT:\n- If no contact is found: \"I couldn't find this number.\"\n- If a contact exists but no relevant records: \"Hi {{name||'customer'}}, I couldn't find that data.\"\n- If the data exists, reply with one short sentence in English, citing the value and, when useful, the unit or date.\n- Return only the final answer (no steps).\n{ \"body\": { \"note\": \"+351 915 550 102\", \"message\": \"Qual é o estado da minha apólice?\" } }\n",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        128,
+        -80
+      ],
+      "id": "577311f6-9d7e-4da0-b0a1-0292aaef8140",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "voice": {
+          "__rl": true,
+          "value": "GzE4TcXfh9rYCU9gVgPp",
+          "mode": "id"
+        },
+        "requestOptions": {}
+      },
+      "type": "@elevenlabs/n8n-nodes-elevenlabs.elevenLabs",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        320
+      ],
+      "id": "6efc3bcb-2762-4b9c-a568-15cdacb4bde5",
+      "name": "Get a voice",
+      "credentials": {
+        "elevenLabsApi": {
+          "id": "GitpCEhFhihD86kj",
+          "name": "ElevenLabs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "speech",
+        "voice": {
+          "__rl": true,
+          "value": "GzE4TcXfh9rYCU9gVgPp",
+          "mode": "id"
+        },
+        "text": "={{ \n  $item(0).$node[\"AI Agent\"].json.output \n  || $item(0).$node[\"When chat message received\"].json.chatInput \n  || \"This is a longer sentence to test ElevenLabs.\"\n}}\n",
+        "additionalOptions": {
+          "model": {
+            "mode": "list",
+            "value": "eleven_multilingual_v2"
+          },
+          "outputFormat": "mp3_44100_128",
+          "languageCode": "en",
+          "voiceSettings": "{\n  \"stability\": 1,\n  \"similarity_boost\": 1,\n  \"style\": 0,\n  \"use_speaker_boost\": true,\n  \"speed\": 1\n}"
+        },
+        "requestOptions": {}
+      },
+      "type": "@elevenlabs/n8n-nodes-elevenlabs.elevenLabs",
+      "typeVersion": 1,
+      "position": [
+        592,
+        192
+      ],
+      "id": "bee237b5-9bf8-4ef6-b640-40c2f97de505",
+      "name": "Convert text to speech",
+      "credentials": {
+        "elevenLabsApi": {
+          "id": "GitpCEhFhihD86kj",
+          "name": "ElevenLabs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Find a contact by phone_last9. Returns fields: \"Customer Name\", \"Customer Phone\".",
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appACZIwKz7HH7IwA",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblCNUFMQIEAxNvGO",
+          "mode": "id"
+        },
+        "filterByFormula": "=RIGHT(\n  REGEX_REPLACE({Customer Phone}, \"[^0-9]\", \"\"),\n  LEN(\"{{$json.phone_last9}}\")\n) = \"{{$json.phone_last9}}\"\n\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtableTool",
+      "typeVersion": 2.1,
+      "position": [
+        272,
+        144
+      ],
+      "id": "2943b5da-119d-47ce-8829-7af5519f93fc",
+      "name": "FindContactByPhone",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "8NZfmtut0lbq6tab",
+          "name": "Airtable Personal Access Token account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Returns the latest policy record for this customer. Fields: \"Policy ID\", \"Status\", \"Policy Type\", \"Coverage Amount\", \"Deductible\", \"Monthly Premium\", \"Start Date\", \"End Date\", \"Notes\".",
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "mode": "id",
+          "value": "appACZIwKz7HH7IwA"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblCNUFMQIEAxNvGO",
+          "mode": "id"
+        },
+        "filterByFormula": "=RIGHT(\n  REGEX_REPLACE({Customer Phone}, \"[^0-9]\", \"\"),\n  LEN(\"{{$json.phone_last9}}\")\n) = \"{{$json.phone_last9}}\"\n",
+        "options": {},
+        "sort": {
+          "property": [
+            {
+              "field": "Start Date",
+              "direction": "desc"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.airtableTool",
+      "typeVersion": 2.1,
+      "position": [
+        400,
+        144
+      ],
+      "id": "927e600a-174e-4260-8520-98a89a61cc8d",
+      "name": "FindPolicyByPhone",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "8NZfmtut0lbq6tab",
+          "name": "Airtable Personal Access Token account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "upload-audio",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "313af2c1-7e0f-4462-974a-7353c7996ea1",
+      "name": "File Upload Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -864,
+        -48
+      ],
+      "webhookId": "c2a37c8e-49e5-4851-a438-2b19812cebfc"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c3d174ce-a8c5-49e6-8d9e-d733f6792126",
+              "name": "body.note",
+              "value": "={{ $json.body.note }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -640,
+        -192
+      ],
+      "id": "7a45d71b-4efc-47e4-9667-11f1a89bf647",
+      "name": "phone number"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fded27e9-e616-49a7-90c1-2e8688172eb9",
+              "name": "body.message",
+              "value": "={{ $json.body.message }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -640,
+        96
+      ],
+      "id": "d588498d-41e4-4b50-8f44-fef990227af2",
+      "name": "request"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -352,
+        -80
+      ],
+      "id": "febda547-80c5-4708-9ad1-dd92e923f0de",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Lê os dados combinados do Merge\nconst bodyNote = $json.body?.note || \"\";\nconst bodyMessage = $json.body?.message || \"\";\n\n// Extrai apenas os dígitos do número\nconst digits = String(bodyNote).replace(/[^0-9]/g, '');\n\n// Garante que tens os últimos 9 dígitos (para matching no Airtable)\nconst phone_last9 = digits.slice(-9);\n\n// Texto do utilizador (mensagem)\nconst user_text = bodyMessage;\n\n// Retorna os campos para o AI Agent\nreturn [\n  {\n    json: {\n      phone_last9,\n      user_text\n    }\n  }\n];\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        -80
+      ],
+      "id": "befdbdb3-7eb0-40f6-96a2-30a781d6dc5b",
+      "name": "Code in JavaScript"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Convert text to speech",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get a voice": {
+      "main": [
+        [
+          {
+            "node": "Convert text to speech",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FindContactByPhone": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FindPolicyByPhone": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "File Upload Webhook": {
+      "main": [
+        [
+          {
+            "node": "phone number",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "request": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "phone number": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert text to speech": {
+      "main": [
+        []
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "873c7f98-a205-491a-87a8-de94c16a355e",
+  "meta": {
+    "instanceId": "30472d6cab4ecfef3f358f06e7cc45d3bcc299bf182d0b4121554d59593cebd4"
+  },
+  "id": "eM5AcnbfvIZ3PmZv",
+  "tags": []
+}
